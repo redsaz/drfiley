@@ -1,0 +1,15 @@
+[package]
+name = "drfiley"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[lib]
+name = "drfiley"
+path = "src/lib.rs"
+
+[[bin]]
+name = "drfiley-collector"
+path = "src/bin/drfiley-collector/main.rs"
+
