@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Result;
-use std::vec::Vec;
+use std::collections::VecDeque;
 
 use std::path::{Path, PathBuf};
 
@@ -25,14 +25,14 @@ impl IntoIterator for Walker {
         let path = Path::new("/home/shayne/Downloads");
         WalkerIntoIterator {
             current_iter: fs::read_dir(path),
-            remaining_dirs: Vec::new(),
+            remaining_dirs: VecDeque::new(),
         }
     }
 }
 
 pub struct WalkerIntoIterator {
     current_iter: Result<fs::ReadDir>,
-    remaining_dirs: Vec<PathBuf>,
+    remaining_dirs: VecDeque<PathBuf>,
 }
 
 impl Iterator for WalkerIntoIterator {
@@ -63,7 +63,7 @@ impl Iterator for WalkerIntoIterator {
                     if self.remaining_dirs.is_empty() {
                         break;
                     }
-                    let opt_path = self.remaining_dirs.pop();
+                    let opt_path = self.remaining_dirs.pop_front();
                     opt_item = match opt_path {
                         Some(path) => {
                             self.current_iter = fs::read_dir(path);
@@ -81,12 +81,12 @@ impl Iterator for WalkerIntoIterator {
                             let path = w.path();
                             if path.is_dir() {
                                 // TODO: Consider VecDeque
-                                self.remaining_dirs.insert(0, path);
+                                self.remaining_dirs.push_back(path);
                             }
                         }
                     }
                     None => {
-                        let opt_path = self.remaining_dirs.pop();
+                        let opt_path = self.remaining_dirs.pop_front();
                         opt_item = match opt_path {
                             Some(path) => {
                                 self.current_iter = fs::read_dir(path);
@@ -104,7 +104,7 @@ impl Iterator for WalkerIntoIterator {
 }
 
 pub fn public_function2() -> Result<()> {
-    println!("called walker's `public_function2()`");
+    eprintln!("called walker's `public_function2()`");
     let path = Path::new("/home/shayne/Downloads");
 
     full_walk(path)
@@ -118,15 +118,15 @@ fn full_walk(path: &Path) -> Result<()> {
         let path = i.path();
         if path.is_dir() {
             sum_dirs += 1;
-            // println!("Found a dir: {}", path.display());
+            // eprintln!("Found a dir: {}", path.display());
             // walk(path.as_path())?;
         } else {
             sum_files += 1;
-            // println!("Found a file maybe: {}", path.display());
+            // eprintln!("Found a file maybe: {}", path.display());
         }
     }
-    println!("Total dirs: {sum_dirs}");
-    println!("Total files: {sum_files}");
+    eprintln!("Total dirs: {sum_dirs}");
+    eprintln!("Total files: {sum_files}");
     Ok(())
 }
 
