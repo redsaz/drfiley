@@ -15,14 +15,16 @@ use std::path::{Path, PathBuf};
 /// This [`io::Result`] will be an [`Err`] if some IO error occurs during
 /// iteration.
 #[derive(Debug)]
-pub struct Walker;
+pub struct Walker {
+    base: PathBuf,
+}
 
 impl IntoIterator for Walker {
     type Item = Result<fs::DirEntry>;
     type IntoIter = WalkerIntoIterator;
 
     fn into_iter(self) -> WalkerIntoIterator {
-        let path = Path::new("/home/shayne/Downloads");
+        let path = self.base.as_path();
         WalkerIntoIterator {
             current_iter: fs::read_dir(path),
             remaining_dirs: VecDeque::new(),
@@ -103,14 +105,7 @@ impl Iterator for WalkerIntoIterator {
     }
 }
 
-pub fn public_function2() -> Result<()> {
-    eprintln!("called walker's `public_function2()`");
-    let path = Path::new("/home/shayne/Downloads");
-
-    full_walk(path)
-}
-
-fn full_walk(path: &Path) -> Result<()> {
+pub fn walk_sum(path: &Path) -> Result<()> {
     let mut sum_dirs = 0;
     let mut sum_files = 0;
     for i in walk(path)? {
@@ -131,5 +126,5 @@ fn full_walk(path: &Path) -> Result<()> {
 }
 
 fn walk(path: &Path) -> Result<Walker> {
-    Ok(Walker)
+    Ok(Walker { base: path.to_path_buf()})
 }
