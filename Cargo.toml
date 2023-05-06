@@ -4,12 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+config = { version = "0.13.3", features = ["toml"] }
+dotenv = "0.15.0"
+serde = { version = "1.0.160", features = ["derive"] }
 
 [lib]
 name = "drfiley"
 path = "src/lib.rs"
 
 [[bin]]
-name = "drfiley-collector"
-path = "src/bin/drfiley-collector/main.rs"
+name = "drfiley-agent"
+path = "src/bin/drfiley-agent/main.rs"
 
