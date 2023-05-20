@@ -73,20 +73,20 @@
 // }
 
 
-use tonic::{transport::Server, Request, Response, Status};
+use tonic::{transport::Server, Request, Response, Status, Streaming};
 
 use api::dr_filey_service_server::{DrFileyService, DrFileyServiceServer};
-use api::{DrFileyRequest, DrFileyResponse};
+use api::{DrFileyRequest, DrFileyResponse, FileStat, FileStatsSummary};
 
 pub mod api {
     tonic::include_proto!("api");
 }
 
 #[derive(Debug, Default)]
-pub struct Echo {}
+pub struct DrFiley {}
 
 #[tonic::async_trait]
-impl DrFileyService for Echo {
+impl DrFileyService for DrFiley {
     async fn echo(&self, request: Request<DrFileyRequest>) -> Result<Response<DrFileyResponse>, Status> {
         println!("Got a request: {:?}", request);
 
@@ -95,18 +95,27 @@ impl DrFileyService for Echo {
         };
 
         Ok(Response::new(reply))
+    } 
+
+    async fn file_stats(&self, request: Request<Streaming<FileStat>>) -> Result<Response<FileStatsSummary>, Status> {
+        println!("Something happened, anyway.");
+         
+        let reply = FileStatsSummary {
+            message: "Well done".to_string(),
+        };
+        Ok(Response::new(reply))
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "127.0.0.1:8888".parse()?;
-    let echo = Echo::default();
+    let drfiley = DrFiley::default();
 
     println!("Server listening on {}", addr);
 
     Server::builder()
-        .add_service(DrFileyServiceServer::new(echo))
+        .add_service(DrFileyServiceServer::new(drfiley))
         .serve(addr)
         .await?;
 
