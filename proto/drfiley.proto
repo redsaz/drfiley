@@ -1,0 +1,23 @@
+syntax = "proto3";
+package api;
+
+message DrFileyRequest {
+  string message = 1;
+}
+
+message DrFileyResponse {
+  string message = 1;
+}
+
+message FileStat {
+  string path = 1;
+}
+
+message fileStatsSummary {
+  string message = 1;
+}
+
+service DrFileyService {
+  rpc Echo(DrFileyRequest) returns (DrFileyResponse);
+  rpc FileStats(stream FileStat) returns (fileStatsSummary) {}
+}

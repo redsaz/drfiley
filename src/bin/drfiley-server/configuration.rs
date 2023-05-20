@@ -7,30 +7,10 @@ use std::path::PathBuf;
 
 #[derive(Deserialize)]
 pub struct Configuration {
-    pub path: PathBuf,
-    pub max_threads: i32,
     pub debug: bool,
-    // TODO log and log rotation?
-    // TODO db location?
-    // TODO partial file read amount for content hash?
-    // TODO do full or partial read?
 }
 
-/*
-drfiley will need to configure:
-- priorities for the following tasks:
-  - stating all files for the first time
-  - stating all files (to detect changes)
-  - hashing file and dir content (potential duplicates only)
-  - hashing file and dir content (potential duplicate or not)
-  - image thumbnails
-  - video thumbnails
-  - text file indexing
-
-This will probably be done with an array, TBD.
- */
-
-/// Configuration for DrFiley Agent.
+/// Configuration for DrFiley Server.
 ///
 /// Configuration is loaded in the following order, highest priority to lowest:
 ///  - environment variables
