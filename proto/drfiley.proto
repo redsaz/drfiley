@@ -1,6 +1,9 @@
 syntax = "proto3";
 package api;
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
 message DrFileyRequest {
   string message = 1;
 }
@@ -15,6 +18,15 @@ message FileStat {
 
 message fileStatsSummary {
   string message = 1;
+}
+
+message ProgressMessage {
+  optional string what = 1; // The action/event underway. ex: "Scanning files"
+  optional double doneness = 2; // 0 (just started) to 1 (complete). ex: 0.75 for 75% done.
+  optional string details = 3; // Any detail message to provide. ex: "Scanning /etc/example/file.conf (Found 123 files, 20 directories)"
+  optional google.protobuf.Timestamp start = 4; // When action/event began. ex: 2023-05-29 01:02:03.123
+  optional google.protobuf.Timestamp end = 5; // When action/event is estimated to end. ex: 2023-05-29 01:03:04.234
+  optional google.protobuf.Duration elapsed = 6; // How long the action/event has lasted so far. ex: 12.2 seconds
 }
 
 service DrFileyService {

@@ -72,7 +72,9 @@
 //     }
 // }
 
+use std::future;
 
+use futures::StreamExt;
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
 use api::dr_filey_service_server::{DrFileyService, DrFileyServiceServer};
@@ -87,7 +89,10 @@ pub struct DrFiley {}
 
 #[tonic::async_trait]
 impl DrFileyService for DrFiley {
-    async fn echo(&self, request: Request<DrFileyRequest>) -> Result<Response<DrFileyResponse>, Status> {
+    async fn echo(
+        &self,
+        request: Request<DrFileyRequest>,
+    ) -> Result<Response<DrFileyResponse>, Status> {
         println!("Got a request: {:?}", request);
 
         let reply = DrFileyResponse {
@@ -95,13 +100,22 @@ impl DrFileyService for DrFiley {
         };
 
         Ok(Response::new(reply))
-    } 
+    }
 
-    async fn file_stats(&self, request: Request<Streaming<FileStat>>) -> Result<Response<FileStatsSummary>, Status> {
-        println!("Something happened, anyway.");
-         
+    async fn file_stats(
+        &self,
+        request: Request<Streaming<FileStat>>,
+    ) -> Result<Response<FileStatsSummary>, Status> {
+        let mut count = 0;
+        let fut = request.into_inner().for_each(|result| {
+            count += 1;
+            println!("Stat'ed: {:?}", result.unwrap().path);
+            future::ready(())
+        });
+        fut.await;
+
         let reply = FileStatsSummary {
-            message: "Well done".to_string(),
+            message: format!("Received {} stats", count),
         };
         Ok(Response::new(reply))
     }

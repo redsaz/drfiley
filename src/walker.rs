@@ -1,6 +1,6 @@
+use std::collections::VecDeque;
 use std::fs;
 use std::io::Result;
-use std::collections::VecDeque;
 
 use std::path::{Path, PathBuf};
 
@@ -125,6 +125,8 @@ pub fn walk_sum(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn walk(path: &Path) -> Result<Walker> {
-    Ok(Walker { base: path.to_path_buf()})
+pub fn walk(path: &Path) -> Result<Walker> {
+    Ok(Walker {
+        base: path.to_path_buf(),
+    })
 }
