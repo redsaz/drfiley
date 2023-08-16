@@ -11,7 +11,7 @@ pub mod api {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = configuration::config().expect("DrFiley Agent must be configured.");
+    let config = configuration::config().expect("DrFiley Agent may be misconfigured.");
     let path = &config.path;
 
     // START - do not connect to server yet

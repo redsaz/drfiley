@@ -1,10 +1,10 @@
 use crate::walker;
 use std::{
-    collections::{BTreeMap},
+    collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
-/// Contains file stuff
+/// Job to collect files and directories of a given directory.
 pub struct StatJob {
     path: PathBuf,
 }

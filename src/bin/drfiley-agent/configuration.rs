@@ -1,4 +1,4 @@
-use config::{Config, ConfigError, Environment, File};
+use config::{Config, ConfigError, Environment, File, FileFormat};
 use core::result::Result;
 use dotenv::dotenv;
 use serde::Deserialize;
@@ -48,18 +48,19 @@ pub fn config() -> Result<Configuration, ConfigError> {
     let custom_config = env::var("DRFILEY_AGENT_CONFIG").unwrap_or(config_file.to_owned());
 
     let s = Config::builder()
-        .add_source(File::with_name(config_file).required(false))
-        .add_source(File::with_name(custom_config.as_str()).required(false))
+        .add_source(File::new(config_file, FileFormat::Toml).required(false))
+        .add_source(File::new(custom_config.as_str(), FileFormat::Toml).required(false))
         .add_source(Environment::with_prefix("drfiley_agent"))
-        .set_default("debug", "false")?
+        .set_default("debug", "true")?
         .set_default("max_threads", "1")?
         .set_default("path", ".")?
         .build()?;
 
     if s.get_bool("debug").unwrap_or_default() {
-        println!("debug: {:?}", s.get_bool("debug"));
-        println!("max_threads: {:?}", s.get_int("max_threads"));
-        println!("path: {:?}", s.get::<String>("path"));
+        eprintln!("custom_config: {custom_config}");
+        eprintln!("debug: {:?}", s.get_bool("debug"));
+        eprintln!("max_threads: {:?}", s.get_int("max_threads"));
+        eprintln!("path: {:?}", s.get::<String>("path"));
     }
 
     s.try_deserialize()
