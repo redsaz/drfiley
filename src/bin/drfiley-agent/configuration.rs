@@ -1,9 +1,10 @@
-use config::{Config, ConfigError, Environment, File, FileFormat};
+use config::{Config, ConfigError, Environment, File, FileFormat, ConfigBuilder, builder::DefaultState};
 use core::result::Result;
 use dotenv::dotenv;
 use serde::Deserialize;
 use std::env;
 use std::path::PathBuf;
+use xdg::{BaseDirectories, FileFindIterator};
 
 #[derive(Deserialize)]
 pub struct Configuration {
@@ -35,7 +36,9 @@ This will probably be done with an array, TBD.
 /// Configuration is loaded in the following order, highest priority to lowest:
 ///  - environment variables
 ///  - environment variables in .env file in current working directory
-///  - Config file specified by DRFILEY_AGENT_CONFIG environment variable
+///  - Config file specified by DRFILEY_AGENT_CONFIG environment variable,
+///  - Config file in drfiley-agent directory of XDG config directories,
+///    example: $HOME/.config/drfiley-agent/agent.toml
 ///  - Config file drfiley-agent.toml in current working directory
 ///
 /// # Errors
@@ -44,13 +47,23 @@ This will probably be done with an array, TBD.
 /// during loading or if some required values were not provided
 pub fn config() -> Result<Configuration, ConfigError> {
     dotenv().ok(); // Load .env entries into env vars
-    let config_file = "drfiley-agent.toml";
-    let custom_config = env::var("DRFILEY_AGENT_CONFIG").unwrap_or(config_file.to_owned());
+    let default_config_file = "drfiley-agent.toml";
+    let custom_config = env::var("DRFILEY_AGENT_CONFIG").unwrap_or(default_config_file.to_owned());
 
-    let s = Config::builder()
-        .add_source(File::new(config_file, FileFormat::Toml).required(false))
+    let mut builder = Config::builder()
+        .add_source(File::new(default_config_file, FileFormat::Toml).required(false));
+
+    if let Ok(base_dirs) = BaseDirectories::with_prefix("drfiley-agent") {
+        for xdg_config in base_dirs.find_config_files("agent.toml") {
+            builder = builder.add_source(File::new(xdg_config.to_string_lossy().to_string().as_str(), FileFormat::Toml).required(false));
+        }
+    }
+
+    builder = builder
         .add_source(File::new(custom_config.as_str(), FileFormat::Toml).required(false))
-        .add_source(Environment::with_prefix("drfiley_agent"))
+        .add_source(Environment::with_prefix("drfiley_agent"));
+
+    let s = builder
         .set_default("debug", "true")?
         .set_default("max_threads", "1")?
         .set_default("path", ".")?

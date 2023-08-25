@@ -36,12 +36,12 @@ DRFILEY_AGENT_PATH=/home/exampleuser/Downloads
 DRFILEY_AGENT_PATH=/home/exampleuser/Downloads; ./drfiley-agent
 ```
 
-The Agent will also look for `drfiley-agent.toml` in the working directory, which can look like this:
+The Agent will also look for the configuration in `~/.config/drfiley-agent/agent.toml` (or wherever the user configured their XDG config path), or for `drfiley-agent.toml` in the working directory. The TOML file can look like this:
 
 ```toml
 debug = true
 max_threads = 1
-path = /home/exampleuser/Downloads
+path = "/home/exampleuser/Downloads"
 ```
 
 If `DRFILEY_AGENT_CONFIG` is an environment variable or in the `.env` file, it will look for a configuration there:
@@ -53,8 +53,9 @@ DRFILEY_AGENT_CONFIG=/etc/drfiley/agent.toml; ./drfiley-agent
 The configuration will be built from any and all of these sources. If a value is specified in multiple locations, it will be prioritized as follows (lowest to highest):
 
 - defaults
-- `drfiley-agent.toml`
-- custom toml file
+- `drfiley-agent.toml` in working dir
+- `~/.config/drfiley-agent/agent.toml` (see [XDG Spec](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html))
+- custom toml file pointed to by `DRFILEY_AGENT_CONFIG`
 - environment variables and `.env`
 
 
