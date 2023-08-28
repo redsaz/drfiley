@@ -4,7 +4,7 @@ use dotenv::dotenv;
 use serde::Deserialize;
 use std::env;
 use std::path::PathBuf;
-use xdg::{BaseDirectories, FileFindIterator};
+use xdg::BaseDirectories;
 
 #[derive(Deserialize)]
 pub struct Configuration {
@@ -19,11 +19,11 @@ pub struct Configuration {
 
 /*
 drfiley will need to configure:
-- priorities for the following tasks:
-  - stating all files for the first time
-  - stating all files (to detect changes)
+- priorities for the following jobs:
+  - scanning files for the first time
+  - scanning (to detect changes)
   - hashing file and dir content (potential duplicates only)
-  - hashing file and dir content (potential duplicate or not)
+  - hashing file and dir content (all, regardless of potential duplicates)
   - image thumbnails
   - video thumbnails
   - text file indexing

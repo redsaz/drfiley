@@ -2,6 +2,7 @@ use api::dr_filey_service_client::DrFileyServiceClient;
 use api::{DrFileyRequest, FileStat};
 use drfiley;
 use futures::stream;
+use rusqlite::{params, Connection, Result};
 
 mod configuration;
 
@@ -35,8 +36,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("RESPONSE={:?}", response.into_inner().message);
     // END - do not connect to server yet
 
-    eprintln!("Stat all files in {}", path.display());
-    let mut job = drfiley::jobs::StatJob::new(path);
-    job.run();
+    eprintln!("Scanning {}", path.display());
+    let job = drfiley::jobs::ScanJob::new(path);
+    let files = job.run();
+    let mut conn = Connection::open("test-cache.sqlite")?;
+    conn.pragma_update_and_check(Option::None, "journal_mode", "WAL", |_row| Ok(()))?;
+    conn.pragma_update(Option::None, "synchronous", "NORMAL")?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS file (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        path TEXT NOT NULL,
+        numbytes INTEGER
+    ) STRICT",
+        (),
+    )?;
+    let tx = conn.transaction()?;
+
+    files.iter().for_each(|file| {
+        tx.execute(
+            "INSERT INTO file (path, numbytes) VALUES (?1, ?2)",
+            params!(file.path.to_str(), file.size_bytes),
+        )
+        .expect("TODO Don't panic");
+    });
+
+    tx.commit()?;
+
     Ok(())
 }
