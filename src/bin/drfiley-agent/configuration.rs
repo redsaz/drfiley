@@ -1,4 +1,6 @@
-use config::{Config, ConfigError, Environment, File, FileFormat, ConfigBuilder, builder::DefaultState};
+use config::{
+    builder::DefaultState, Config, ConfigBuilder, ConfigError, Environment, File, FileFormat,
+};
 use core::result::Result;
 use dotenv::dotenv;
 use serde::Deserialize;
@@ -55,7 +57,13 @@ pub fn config() -> Result<Configuration, ConfigError> {
 
     if let Ok(base_dirs) = BaseDirectories::with_prefix("drfiley-agent") {
         for xdg_config in base_dirs.find_config_files("agent.toml") {
-            builder = builder.add_source(File::new(xdg_config.to_string_lossy().to_string().as_str(), FileFormat::Toml).required(false));
+            builder = builder.add_source(
+                File::new(
+                    xdg_config.to_string_lossy().to_string().as_str(),
+                    FileFormat::Toml,
+                )
+                .required(false),
+            );
         }
     }
 

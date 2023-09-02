@@ -12,7 +12,7 @@ pub struct ScanJob {
 #[derive(Debug)]
 pub struct ScanItem {
     pub path: PathBuf,
-    pub size_bytes: u64
+    pub size_bytes: u64,
 }
 
 #[derive(Debug)]
@@ -56,7 +56,10 @@ impl ScanJob {
                 sum_files += 1;
                 let md = path.metadata().expect("Failed to fetch metadata.");
                 let file_size = md.len();
-                files.push(ScanItem{path: path, size_bytes: file_size});
+                files.push(ScanItem {
+                    path: path,
+                    size_bytes: file_size,
+                });
             }
         }
         eprintln!("Total dirs: {sum_dirs}");
@@ -79,7 +82,8 @@ impl ScanJob {
             let mut parent = &mut tree;
 
             // Ensure all parent path parts of the file are initialized in the tree, and advance the parent
-            for dir_part in file.path
+            for dir_part in file
+                .path
                 .parent()
                 .expect("Path ended in a root or prefix, or was empty.")
                 .components()
@@ -93,7 +97,8 @@ impl ScanJob {
                 };
             }
             // Insert the file into the tree
-            let file_name = PathBuf::from(file.path.file_name().expect("Should have filename, not .."));
+            let file_name =
+                PathBuf::from(file.path.file_name().expect("Should have filename, not .."));
             match parent {
                 PathNode::Dir { size_bytes: _, items} => items.entry(file_name.to_owned()).or_insert_with(|| PathNode::File{size_bytes: file.size_bytes}),
                 PathNode::File {size_bytes: _} => panic!("Cannot treeify {file:?} because its parent directory is somehow a file instead."),

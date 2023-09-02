@@ -2,7 +2,86 @@ syntax = "proto3";
 package api;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+
+// An agent has started and is ready to do work.
+message AgentReadyRequest {
+  // TODO: Use a more cryptographically better scheme than this
+  // The agent's key, given by the handler.
+  optional string key = 1;
+}
+
+// A handler is ready to communicate with the agent.
+message AgentReadyResponse {
+  // TODO: Use a more cryptographically better scheme than this
+  // If specified, the agent is expected to use this next time it connects.
+  optional string key = 1;
+}
+
+message AgentListenResponse {
+  // A message from Handler to the Agent to keep connection alive.
+  message Heartbeat {};
+  // Get a list of directories in a given path.
+  message GetDirs {
+    optional bytes path = 1;
+  };
+  // Get list of paths periodically scanned by the agent.
+  message GetScanPaths {};
+  // Add a path to scan periodically by the agent.
+  message ChangeScanPaths {
+    repeated bytes paths_to_add = 1;
+    repeated bytes paths_to_delete = 2;
+  };
+  oneof what {
+    Heartbeat heartbeat = 1;
+    GetDirs get_dirs = 2;
+    GetScanPaths get_scan_paths = 3;
+    ChangeScanPaths change_scan_paths = 4;
+  }
+}
+
+// A DrFiley Handler receives information from Agents and tells Agents what to
+// do.
+service Handler {
+  // Agent tells its handler that it is ready to do work.
+  rpc AgentReady(AgentReadyRequest) returns (AgentReadyResponse) {}
+
+  // Open up a communication channel from the handler to the agent.
+  rpc AgentListen(google.protobuf.Empty) returns (stream AgentListenResponse) {}
+
+  rpc AgentScannedItems(stream ScannedItem) returns (google.protobuf.Empty) {}
+
+  // The Agent is replying to a request to list the directories in a path.
+  rpc ReplyGetDirs(Paths) returns (google.protobuf.Empty) {}
+
+  // Agent tells handler what paths it scans for changes.
+  rpc ReplyGetScanPaths(ScanPaths) returns (google.protobuf.Empty) {}
+}
+
+message Path { bytes path = 1; }
+
+message Paths { repeated bytes paths = 1; }
+
+message ScanPath {
+  bytes path = 1;
+  optional google.protobuf.Timestamp lastScanned = 2;
+}
+
+message ScanPaths { repeated ScanPath path = 1; }
+
+message ScannedItem {
+  bytes path = 1;
+}
+
+// A DrFiley Agent sends information about its host back to the DrFiley Server.
+service Agent {
+  // Return a list of all the paths that the agent periodically scans.
+  rpc GetScanPaths(google.protobuf.Empty) returns (ScanPaths) {}
+}
+
+// MAYBE NOT USE STUFF BELOW THIS
+// Everything below here seems generic, rather than specific.
 
 message DrFileyRequest {
   string message = 1;

@@ -1,135 +1,111 @@
-// pub mod api {
-//     tonic::include_proto!("api");
-// }
-
-// use std::{str, thread};
-// mod configuration;
-// use tonic::{transport::Server, Request, Response, Status};
-// use api::echo_service_server::{EchoService, EchoServiceServer};
-// use api::{EchoRequest, EchoResponse};
-
-// #[derive(Debug, Default)]
-// pub struct Echo {}
-
-// impl EchoService for Echo {
-//     fn echo(&self, request: Request<EchoRequest>) -> Result<Response<EchoResponse>, Status> {
-//         println!("Got a request: {:?}", request);
-
-//         let reply = EchoResponse {
-//             message: format!("{}", request.into_inner().message),
-//         };
-
-//         Ok(Response::new(reply))
-//     }
-// }
-
-// #[tokio::main]
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     let addr = format!("{}:{}", "127.0.0.1", "50052").parse()?;
-//     let echo = Echo::default();
-
-//     println!("Server listening on {}", addr);
-
-//     Server::builder()
-//         .add_service(EchoServiceServer::new(echo))
-//         .serve(addr)
-//         .await?;
-
-//     Ok(())
-// }
-
-// // fn main() {
-// //     let config = configuration::config().expect("DrFiley Server must be configured.");
-
-// //     let thread_one = thread::spawn(|| listen());
-
-// //     thread_one.join().unwrap();
-// // }
-
-// fn listen() {
-//     let ctx = zmq::Context::new();
-
-//     let socket = ctx.socket(zmq::ROUTER).unwrap();
-//     socket.bind("tcp://*:8888").unwrap();
-//     let id = [125u8];
-//     socket.set_identity(&id).expect("Identity failed to set.");
-//     socket.set_router_mandatory(true).expect("router mandatory");
-//     loop {
-//         let id = socket.recv_bytes(0).expect("Getting id");
-//         let data = socket.recv_string(0).expect("Testing recv");
-//         println!(
-//             "Id: {:?} Message: {}",
-//             id,
-//             data.expect("Error converting message to utf8")
-//         );
-//         socket.send(&id, zmq::SNDMORE).expect("testing id");
-//         socket.send("", zmq::SNDMORE).expect("blank");
-//         socket.send("Hello there", 0).expect("Testing reply");
-
-//         socket.send(&id, zmq::SNDMORE).expect("testing id");
-//         socket.send("", zmq::SNDMORE).expect("blank");
-//         socket.send("Hello there again", 0).expect("Testing reply")
-//     }
-// }
-
 use std::future;
+use std::option::Option;
+use std::pin::Pin;
 
-use futures::StreamExt;
+use api::agent_listen_response::{Heartbeat, What};
+use futures::{Future, Stream, StreamExt};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
-use api::dr_filey_service_server::{DrFileyService, DrFileyServiceServer};
-use api::{DrFileyRequest, DrFileyResponse, FileStat, FileStatsSummary};
+use api::handler_server::{Handler, HandlerServer};
+use api::{
+    AgentListenResponse, AgentReadyRequest, AgentReadyResponse, Paths, ScanPaths, ScannedItem,
+};
 
 pub mod api {
     tonic::include_proto!("api");
 }
 
-#[derive(Debug, Default)]
-pub struct DrFiley {}
+pub struct DrFileyHandler {}
 
 #[tonic::async_trait]
-impl DrFileyService for DrFiley {
-    async fn echo(
+impl Handler for DrFileyHandler {
+    type AgentListenStream =
+        Pin<Box<dyn Stream<Item = Result<AgentListenResponse, Status>> + Send>>;
+
+    async fn agent_ready(
         &self,
-        request: Request<DrFileyRequest>,
-    ) -> Result<Response<DrFileyResponse>, Status> {
+        request: Request<AgentReadyRequest>,
+    ) -> Result<Response<AgentReadyResponse>, Status> {
         println!("Got a request: {:?}", request);
 
-        let reply = DrFileyResponse {
-            message: format!("{}", request.into_inner().message),
-        };
+        let reply = AgentReadyResponse { key: Option::None };
 
         Ok(Response::new(reply))
     }
 
-    async fn file_stats(
+    async fn agent_listen(
         &self,
-        request: Request<Streaming<FileStat>>,
-    ) -> Result<Response<FileStatsSummary>, Status> {
+        request: Request<()>,
+    ) -> Result<Response<<DrFileyHandler as Handler>::AgentListenStream>, Status> {
+        // the stream is the communication back to the client.
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        tokio::spawn(async move {
+            loop {
+                // For now, do something every 10 seconds
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+                let aim = AgentListenResponse {
+                    what: Some(What::Heartbeat(Heartbeat {})),
+                };
+
+                if let Err(err) = tx.send(Ok(aim)) {
+                    println!("ERROR: failed to update stream client: {:?}", err);
+                    return;
+                }
+            }
+        });
+
+        let stream = UnboundedReceiverStream::new(rx);
+        Ok(Response::new(Box::pin(stream) as Self::AgentListenStream))
+    }
+
+    async fn agent_scanned_items(
+        &self,
+        request: Request<Streaming<ScannedItem>>,
+    ) -> Result<Response<()>, Status> {
         let mut count = 0;
         let fut = request.into_inner().for_each(|result| {
             count += 1;
-            println!("Stat'ed: {:?}", result.unwrap().path);
+            println!("Received: {:?}", result.unwrap().path);
             future::ready(())
         });
         fut.await;
+        Ok(Response::new(()))
+    }
 
-        let reply = FileStatsSummary {
-            message: format!("Received {} stats", count),
-        };
-        Ok(Response::new(reply))
+    async fn reply_get_dirs(&self, _: Request<Paths>) -> Result<Response<()>, Status> {
+        todo!()
+    }
+
+    async fn reply_get_scan_paths(&self, _: Request<ScanPaths>) -> Result<Response<()>, Status> {
+        todo!()
+    }
+}
+
+impl Default for DrFileyHandler {
+    fn default() -> Self {
+        DrFileyHandler {}
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "127.0.0.1:8888".parse()?;
-    let drfiley = DrFiley::default();
+    let handler = DrFileyHandler::default();
 
     println!("Server listening on {}", addr);
 
+    // let reflection_service = tonic_reflection::server::Builder::configure()
+    // .register_encoded_file_descriptor_set(api::FILE_DESCRIPTOR_SET)
+    // .build()
+    // .unwrap();
+
     Server::builder()
-        .add_service(DrFileyServiceServer::new(drfiley))
+        .add_service(HandlerServer::new(handler))
+        // .add_service(reflection_service)
         .serve(addr)
         .await?;
 
