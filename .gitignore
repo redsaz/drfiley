@@ -12,4 +12,4 @@ Cargo.lock
 .env
 .vscode
 **/*.log
-test-drfiley-*.toml
+test-drfiley-*

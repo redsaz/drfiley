@@ -24,14 +24,20 @@ message AgentListenResponse {
   message Heartbeat {};
   // Get a list of directories in a given path.
   message GetDirs {
-    optional bytes path = 1;
+    // path is a string, instead of bytes for now (paths can be any series of
+    // bytes, without \0)
+    optional string path = 1;
   };
   // Get list of paths periodically scanned by the agent.
   message GetScanPaths {};
   // Add a path to scan periodically by the agent.
   message ChangeScanPaths {
-    repeated bytes paths_to_add = 1;
-    repeated bytes paths_to_delete = 2;
+    // path is a string, instead of bytes for now (paths can be any series of
+    // bytes, without \0)
+    repeated string paths_to_add = 1;
+    // path is a string, instead of bytes for now (paths can be any series of
+    // bytes, without \0)
+    repeated string paths_to_delete = 2;
   };
   oneof what {
     Heartbeat heartbeat = 1;
@@ -43,7 +49,7 @@ message AgentListenResponse {
 
 // A DrFiley Handler receives information from Agents and tells Agents what to
 // do.
-service Handler {
+service DrFileyHandler {
   // Agent tells its handler that it is ready to do work.
   rpc AgentReady(AgentReadyRequest) returns (AgentReadyResponse) {}
 
@@ -59,20 +65,24 @@ service Handler {
   rpc ReplyGetScanPaths(ScanPaths) returns (google.protobuf.Empty) {}
 }
 
-message Path { bytes path = 1; }
+// path is a string, instead of bytes for now (paths can be any series of bytes,
+// without \0)
+message Path { string path = 1; }
 
-message Paths { repeated bytes paths = 1; }
+// path is a string, instead of bytes for now (paths can be any series of bytes,
+// without \0)
+message Paths { repeated string paths = 1; }
 
+// path is a string, instead of bytes for now (paths can be any series of bytes,
+// without \0)
 message ScanPath {
-  bytes path = 1;
+  string path = 1;
   optional google.protobuf.Timestamp lastScanned = 2;
 }
 
 message ScanPaths { repeated ScanPath path = 1; }
 
-message ScannedItem {
-  bytes path = 1;
-}
+message ScannedItem { string path = 1; uint64 sizeBytes = 2; }
 
 // A DrFiley Agent sends information about its host back to the DrFiley Server.
 service Agent {
@@ -80,35 +90,17 @@ service Agent {
   rpc GetScanPaths(google.protobuf.Empty) returns (ScanPaths) {}
 }
 
-// MAYBE NOT USE STUFF BELOW THIS
-// Everything below here seems generic, rather than specific.
-
-message DrFileyRequest {
-  string message = 1;
-}
-
-message DrFileyResponse {
-  string message = 1;
-}
-
-message FileStat {
-  string path = 1;
-}
-
-message fileStatsSummary {
-  string message = 1;
-}
-
 message ProgressMessage {
   optional string what = 1; // The action/event underway. ex: "Scanning files"
-  optional double doneness = 2; // 0 (just started) to 1 (complete). ex: 0.75 for 75% done.
-  optional string details = 3; // Any detail message to provide. ex: "Scanning /etc/example/file.conf (Found 123 files, 20 directories)"
-  optional google.protobuf.Timestamp start = 4; // When action/event began. ex: 2023-05-29 01:02:03.123
-  optional google.protobuf.Timestamp end = 5; // When action/event is estimated to end. ex: 2023-05-29 01:03:04.234
-  optional google.protobuf.Duration elapsed = 6; // How long the action/event has lasted so far. ex: 12.2 seconds
-}
-
-service DrFileyService {
-  rpc Echo(DrFileyRequest) returns (DrFileyResponse);
-  rpc FileStats(stream FileStat) returns (fileStatsSummary) {}
+  optional double doneness =
+      2; // 0 (just started) to 1 (complete). ex: 0.75 for 75% done.
+  optional string details =
+      3; // Any detail message to provide. ex: "Scanning /etc/example/file.conf
+         // (Found 123 files, 20 directories)"
+  optional google.protobuf.Timestamp start =
+      4; // When action/event began. ex: 2023-05-29 01:02:03.123
+  optional google.protobuf.Timestamp end =
+      5; // When action/event is estimated to end. ex: 2023-05-29 01:03:04.234
+  optional google.protobuf.Duration elapsed =
+      6; // How long the action/event has lasted so far. ex: 12.2 seconds
 }

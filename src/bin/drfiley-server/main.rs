@@ -1,14 +1,15 @@
 use std::future;
 use std::option::Option;
+use std::path::PathBuf;
 use std::pin::Pin;
 
-use api::agent_listen_response::{Heartbeat, What};
+use api::agent_listen_response::{ChangeScanPaths, Heartbeat, What};
 use futures::{Future, Stream, StreamExt};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
-use api::handler_server::{Handler, HandlerServer};
+use api::dr_filey_handler_server::{DrFileyHandler, DrFileyHandlerServer};
 use api::{
     AgentListenResponse, AgentReadyRequest, AgentReadyResponse, Paths, ScanPaths, ScannedItem,
 };
@@ -17,10 +18,10 @@ pub mod api {
     tonic::include_proto!("api");
 }
 
-pub struct DrFileyHandler {}
+pub struct DrFileyHandlerImpl {}
 
 #[tonic::async_trait]
-impl Handler for DrFileyHandler {
+impl DrFileyHandler for DrFileyHandlerImpl {
     type AgentListenStream =
         Pin<Box<dyn Stream<Item = Result<AgentListenResponse, Status>> + Send>>;
 
@@ -38,20 +39,34 @@ impl Handler for DrFileyHandler {
     async fn agent_listen(
         &self,
         request: Request<()>,
-    ) -> Result<Response<<DrFileyHandler as Handler>::AgentListenStream>, Status> {
+    ) -> Result<Response<<DrFileyHandlerImpl as DrFileyHandler>::AgentListenStream>, Status> {
         // the stream is the communication back to the client.
         let (tx, rx) = mpsc::unbounded_channel();
 
         tokio::spawn(async move {
+            // First, add a directory to periodically sync.
+            // Normally this would happen at some point by the user going through the gui, but
+            // since we're testing comms, for now we'll just have the server add the directory.
+            let alr = AgentListenResponse {
+                what: Some(What::ChangeScanPaths(ChangeScanPaths {
+                    paths_to_add: vec![".".to_string()],
+                    paths_to_delete: vec![],
+                })),
+            };
+            if let Err(err) = tx.send(Ok(alr)) {
+                println!("ERROR: failed to update stream client: {:?}", err);
+                return;
+            }
+
             loop {
-                // For now, do something every 10 seconds
+                // We're still just testing things. Send a heartbeat periodically.
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-                let aim = AgentListenResponse {
+                let alr = AgentListenResponse {
                     what: Some(What::Heartbeat(Heartbeat {})),
                 };
 
-                if let Err(err) = tx.send(Ok(aim)) {
+                if let Err(err) = tx.send(Ok(alr)) {
                     println!("ERROR: failed to update stream client: {:?}", err);
                     return;
                 }
@@ -85,16 +100,16 @@ impl Handler for DrFileyHandler {
     }
 }
 
-impl Default for DrFileyHandler {
+impl Default for DrFileyHandlerImpl {
     fn default() -> Self {
-        DrFileyHandler {}
+        DrFileyHandlerImpl {}
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "127.0.0.1:8888".parse()?;
-    let handler = DrFileyHandler::default();
+    let handler = DrFileyHandlerImpl::default();
 
     println!("Server listening on {}", addr);
 
@@ -104,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // .unwrap();
 
     Server::builder()
-        .add_service(HandlerServer::new(handler))
+        .add_service(DrFileyHandlerServer::new(handler))
         // .add_service(reflection_service)
         .serve(addr)
         .await?;

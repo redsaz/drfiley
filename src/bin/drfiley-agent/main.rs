@@ -1,10 +1,16 @@
-use api::agent_listen_response::What;
-use api::handler_client::HandlerClient;
+use std::path::{Path, PathBuf};
+
+use api::agent_listen_response::{ChangeScanPaths, What};
+use api::dr_filey_handler_client::DrFileyHandlerClient;
 use api::{AgentListenResponse, AgentReadyRequest};
+use configuration::Configuration;
 use drfiley;
 use futures::stream;
 use rusqlite::{params, Connection, Result};
+use tonic::transport::Channel;
 use tonic::Request;
+
+use crate::api::{ScanPaths, ScannedItem};
 
 mod configuration;
 
@@ -15,9 +21,8 @@ pub mod api {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = configuration::config().expect("DrFiley Agent may be misconfigured.");
-    let path = &config.path;
 
-    let mut client = HandlerClient::connect("http://127.0.0.1:8888").await?;
+    let mut client = DrFileyHandlerClient::connect("http://127.0.0.1:8888").await?;
 
     let request = Request::new(AgentReadyRequest {
         key: Some("woo".to_string()),
@@ -42,7 +47,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         What::Heartbeat(_) => eprintln!("Got heartbeat."),
                         What::GetDirs(_) => todo!(),
                         What::GetScanPaths(_) => todo!(),
-                        What::ChangeScanPaths(_) => todo!(),
+                        What::ChangeScanPaths(scan_paths) => {
+                            change_scan_paths(&config, &scan_paths, &mut client).await?
+                        }
                     }
                 }
             }
@@ -70,10 +77,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("RESPONSE={:?}", response.into_inner().message);
     // END - do not connect to server yet
 
+    Ok(())
+}
+
+async fn change_scan_paths(
+    config: &Configuration,
+    scan_paths: &ChangeScanPaths,
+    client: &mut DrFileyHandlerClient<Channel>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: This would be added to the config and a job would eventually start.
+    // Here, we're short circuiting all of that in the name of testing.
+    for path in scan_paths.paths_to_add.as_slice() {
+        let path = PathBuf::from(path);
+        scan_files(config, &path, client).await?;
+    }
+    Ok(())
+}
+
+async fn scan_files(
+    config: &Configuration,
+    path: &PathBuf,
+    client: &mut DrFileyHandlerClient<Channel>,
+) -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Scanning {}", path.display());
     let job = drfiley::jobs::ScanJob::new(path);
     let files = job.run();
-    let mut conn = Connection::open("test-cache.sqlite")?;
+    let mut conn = Connection::open("test-drfiley-cache.sqlite")?;
     conn.pragma_update_and_check(Option::None, "journal_mode", "WAL", |_row| Ok(()))?;
     conn.pragma_update(Option::None, "synchronous", "NORMAL")?;
     conn.execute(
@@ -93,6 +122,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .expect("TODO Don't panic");
     });
+
+    let request = tonic::Request::new(stream::iter(files.into_iter().map(|item| ScannedItem {
+        path: item.path.to_string_lossy().to_string(),
+        size_bytes: item.size_bytes,
+    })));
+
+    let response = client.agent_scanned_items(request).await;
+    if let Err(e) = response {
+        eprintln!("RESPONSE ERROR={:?}", e);
+        return Err(Box::new(e));
+    }
 
     tx.commit()?;
 
