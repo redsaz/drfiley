@@ -1,8 +1,10 @@
+use std::io::Error;
 use std::future;
 use std::option::Option;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+use actix_web::{HttpServer, App, web, HttpRequest, Responder};
 use api::agent_listen_response::{ChangeScanPaths, Heartbeat, What};
 use futures::{Future, Stream, StreamExt};
 use tokio::sync::mpsc;
@@ -106,9 +108,14 @@ impl Default for DrFileyHandlerImpl {
     }
 }
 
+async fn index(_req: HttpRequest) -> impl Responder {
+    "Hello."
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "127.0.0.1:8888".parse()?;
+// #[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let addr = "127.0.0.1:8888".parse().expect("Couldn't parse grpc address");
     let handler = DrFileyHandlerImpl::default();
 
     println!("Server listening on {}", addr);
@@ -118,11 +125,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // .build()
     // .unwrap();
 
-    Server::builder()
+    let grpc_server = Server::builder()
         .add_service(DrFileyHandlerServer::new(handler))
         // .add_service(reflection_service)
-        .serve(addr)
-        .await?;
+        .serve(addr);
 
+    let h2_server = HttpServer::new(|| App::new().route("/", web::get().to(index)))
+        .bind(("127.0.0.1", 8080))?
+        .run();
+
+    // Note: just using join! here without first using spawn on both futures will cause them
+    // to run in one thread. See: https://stackoverflow.com/a/69639766
+    tokio::join!(grpc_server, h2_server);
+
+    // TODO: Properly pass errors, rather than whatever the above is doing.
+
+    // TODO: Properly handle ctrl+c: https://tokio.rs/tokio/topics/shutdown
     Ok(())
 }

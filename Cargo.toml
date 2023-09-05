@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.75"
 actix-web = "4.4.0"
 bebop = "2.6.0"
 config = { version = "0.13.3", features = ["toml"] }
